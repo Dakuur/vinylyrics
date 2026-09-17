@@ -132,6 +132,8 @@ def test_build_side_structure_is_exact_with_zero_speed_variation(tmp_path: Path)
     assert truth["tracks"][0]["end_sec"] == pytest.approx(2.5, abs=0.02)
     assert truth["tracks"][1]["start_sec"] == pytest.approx(2.5 + 0.2, abs=0.02)
     assert truth["sample_rate"] == 44100
+    assert isinstance(truth["tracks"][0]["wow_phase"], float)
+    assert isinstance(truth["tracks"][0]["flutter_phase"], float)
 
 
 def test_build_side_applies_nonzero_speed_variation(tmp_path: Path):
@@ -155,13 +157,31 @@ def test_build_side_dry_mode_truncates_tracks(tmp_path: Path):
     assert truth["tracks"][0]["end_sec"] == pytest.approx(2.0, abs=0.02)
 
 
+def test_build_side_is_deterministic_and_gaps_are_not_silent(tmp_path: Path):
+    track1 = _make_track(tmp_path, "one.wav", 1.0)
+    track2 = _make_track(tmp_path, "two.wav", 1.0)
+    params = _zero_speed_params(lead_in=0.1, gap=0.2, lead_out=0.1)
+
+    audio_a, truth_a = build_side([track1, track2], params, np.random.default_rng(42))
+    audio_b, truth_b = build_side([track1, track2], params, np.random.default_rng(42))
+
+    assert np.array_equal(audio_a, audio_b)
+    assert truth_a == truth_b
+
+    sr = params.output.sample_rate
+    gap_start = int(truth_a["tracks"][0]["end_sec"] * sr)
+    gap_end = int(truth_a["tracks"][1]["start_sec"] * sr)
+    assert gap_end > gap_start
+    assert np.all(audio_a[gap_start:gap_end] != 0)
+
+
 def test_write_side_creates_wav_and_truth_json(tmp_path: Path):
     import soundfile as sf
 
     audio = np.zeros(44100, dtype=np.float32)
     truth = {"sample_rate": 44100, "duration_sec": 1.0, "tracks": []}
 
-    wav_path, json_path = write_side(audio, truth, tmp_path / "out", index=1)
+    wav_path, json_path = write_side(audio, truth, tmp_path / "out", "cara_01")
 
     assert wav_path.name == "cara_01.wav"
     assert json_path.name == "cara_01.truth.json"

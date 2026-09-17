@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 import numpy as np
@@ -65,12 +64,8 @@ def _cmd_build(args: argparse.Namespace) -> int:
     if args.dry:
         selected = select_tracks(tracks, 3, rng)
         audio, truth = build_side(selected, params, rng, max_track_seconds=30.0)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        wav_path = output_dir / "dry.wav"
-        json_path = output_dir / "dry.truth.json"
-        import soundfile as sf
-        sf.write(wav_path, audio, truth["sample_rate"])
-        json_path.write_text(json.dumps(truth, indent=2, ensure_ascii=False))
+        truth["seed"] = args.seed
+        wav_path, json_path = write_side(audio, truth, output_dir, "dry")
         print(f"Generado {wav_path} ({truth['duration_sec']:.1f}s, {len(selected)} pistas)")
         return 0
 
@@ -78,13 +73,15 @@ def _cmd_build(args: argparse.Namespace) -> int:
         groups = partition_tracks(tracks, args.tracks, rng)
         for i, group in enumerate(groups, start=1):
             audio, truth = build_side(group, params, rng)
-            wav_path, _ = write_side(audio, truth, output_dir, i)
+            truth["seed"] = args.seed
+            wav_path, _ = write_side(audio, truth, output_dir, f"cara_{i:02d}")
             print(f"Generado {wav_path} ({truth['duration_sec']:.1f}s, {len(group)} pistas)")
         return 0
 
     selected = select_tracks(tracks, args.tracks, rng)
     audio, truth = build_side(selected, params, rng)
-    wav_path, _ = write_side(audio, truth, output_dir, 1)
+    truth["seed"] = args.seed
+    wav_path, _ = write_side(audio, truth, output_dir, f"cara_{1:02d}")
     print(f"Generado {wav_path} ({truth['duration_sec']:.1f}s, {len(selected)} pistas)")
     return 0
 

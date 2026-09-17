@@ -81,21 +81,24 @@ def build_side(
                 "speed_offset": profile.offset,
                 "wow_freq_hz": profile.wow_freq_hz,
                 "wow_depth": profile.wow_depth,
+                "wow_phase": profile.wow_phase,
                 "flutter_freq_hz": profile.flutter_freq_hz,
                 "flutter_depth": profile.flutter_depth,
+                "flutter_phase": profile.flutter_phase,
             }
         )
         offset += len(audio) + gap_samples
 
     mixed = music_layer + noise_layer
-    peak = float(np.max(np.abs(mixed))) if len(mixed) else 0.0
-    if peak > 0.95:
-        mixed = mixed * (0.95 / peak)
 
     board = Pedalboard(
         [HighShelfFilter(cutoff_frequency_hz=params.filter.shelf_cutoff_hz, gain_db=params.filter.shelf_gain_db)]
     )
     final = board(mixed, output_sr).astype(np.float32)
+
+    peak = float(np.max(np.abs(final))) if len(final) else 0.0
+    if peak > 0.95:
+        final = final * (0.95 / peak)
 
     truth = {
         "sample_rate": output_sr,
@@ -105,11 +108,11 @@ def build_side(
     return final, truth
 
 
-def write_side(audio: np.ndarray, truth: dict, output_dir: Path, index: int) -> tuple[Path, Path]:
+def write_side(audio: np.ndarray, truth: dict, output_dir: Path, stem: str) -> tuple[Path, Path]:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    wav_path = output_dir / f"cara_{index:02d}.wav"
-    json_path = output_dir / f"cara_{index:02d}.truth.json"
+    wav_path = output_dir / f"{stem}.wav"
+    json_path = output_dir / f"{stem}.truth.json"
     sf.write(wav_path, audio, truth["sample_rate"])
     json_path.write_text(json.dumps(truth, indent=2, ensure_ascii=False))
     return wav_path, json_path

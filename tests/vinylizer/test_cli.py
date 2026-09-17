@@ -84,6 +84,7 @@ def test_build_default_creates_one_side(tmp_path: Path):
     assert (out_dir / "cara_01.truth.json").exists()
     truth = json.loads((out_dir / "cara_01.truth.json").read_text())
     assert len(truth["tracks"]) == 2
+    assert truth["seed"] == 1
 
 
 def test_build_all_splits_every_usable_track(tmp_path: Path):

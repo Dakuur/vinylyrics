@@ -22,6 +22,20 @@ uv sync
 uv run vinylizer inspect /ruta/a/tus/mp3
 ```
 
+```bash
+uv run vinylizer build /ruta/a/tus/mp3 --tracks 6 --seed 42
+```
+
+Genera un WAV que simula una cara de vinilo, junto a su `.truth.json` con los
+datos reales usados (pistas, offsets de velocidad, ruido). Opciones:
+
+- `--tracks N`: pistas por cara (por defecto 6).
+- `--all`: reparte todas las pistas usables en varias caras en vez de una sola.
+- `--dry`: genera ~90s de prueba (3 fragmentos de 30s) para revisar rápido.
+- `--seed S`: semilla para reproducibilidad.
+- `--output-dir DIR`: carpeta de salida (por defecto `data/vinylizer_output`).
+- `--params PATH`: ruta a un TOML de parámetros alternativo.
+
 ## Licencia
 
 GPLv3 — ver [LICENSE](LICENSE). (Elegida por la dependencia `pedalboard`, que
