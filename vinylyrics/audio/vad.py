@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum, auto
 
@@ -14,7 +15,13 @@ class AudioEvent(Enum):
 
 
 def compute_rms_windows(audio: np.ndarray, sample_rate: int, window_sec: float = 0.1) -> np.ndarray:
-    window_samples = max(1, int(window_sec * sample_rate))
+    window_samples = max(1, int(round(window_sec * sample_rate)))
+    actual_window_sec = window_samples / sample_rate
+    if not math.isclose(actual_window_sec, window_sec, rel_tol=1e-6, abs_tol=1e-9):
+        raise ValueError(
+            f"window_sec={window_sec} does not evenly divide into samples at "
+            f"sample_rate={sample_rate} (closest achievable: {actual_window_sec})"
+        )
     n_windows = len(audio) // window_samples
     if n_windows == 0:
         return np.zeros(0, dtype=np.float32)
@@ -39,6 +46,8 @@ class SilenceThresholds:
 
 class SilenceDetector:
     def __init__(self, floor_dbfs: float, thresholds: SilenceThresholds = SilenceThresholds()):
+        if not math.isfinite(floor_dbfs):
+            raise ValueError(f"floor_dbfs must be finite, got {floor_dbfs!r}")
         self._floor = floor_dbfs
         self._thresholds = thresholds
         self._is_silent = False

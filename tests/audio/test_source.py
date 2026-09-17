@@ -87,6 +87,30 @@ def test_file_source_realtime_respects_wall_clock(tmp_path: Path):
     assert elapsed >= 0.28
 
 
+def test_file_source_read_returns_a_copy_not_a_view(tmp_path: Path):
+    path = _make_wav(tmp_path, seconds=2.0, sr=16000)
+    source = FileSource(path, sample_rate=16000)
+    chunk = source.read(1.0)
+    chunk[:] = 99.0
+    # a second read from the same region (rewind not supported, so just check
+    # internal audio wasn't mutated by re-reading is not directly testable via
+    # public API; instead assert the returned array's flags show it owns its data)
+    assert chunk.base is None or chunk.flags["OWNDATA"]
+
+
+def test_file_source_realtime_does_not_oversleep_past_end_of_file(tmp_path: Path):
+    path = _make_wav(tmp_path, seconds=0.5, sr=16000)
+    source = FileSource(path, sample_rate=16000, realtime=True)
+
+    source.read(0.5)  # consume everything
+    start = time.monotonic()
+    empty = source.read(2.0)  # nothing left; must not sleep ~2s
+    elapsed = time.monotonic() - start
+
+    assert empty.shape[0] == 0
+    assert elapsed < 0.5
+
+
 def test_line_in_source_does_not_touch_hardware_at_construction():
     fake_sd = types.ModuleType("sounddevice")
     fake_sd.InputStream = mock.MagicMock()
@@ -125,6 +149,55 @@ def test_line_in_source_reuses_stream_across_reads():
         source.read(0.1)
         source.read(0.1)
         fake_sd.InputStream.assert_called_once()
+
+
+def test_line_in_source_close_stops_and_closes_stream():
+    fake_sd = types.ModuleType("sounddevice")
+    fake_stream = mock.MagicMock()
+    fake_stream.read.return_value = (np.zeros((1600, 1), dtype=np.float32), False)
+    fake_sd.InputStream = mock.MagicMock(return_value=fake_stream)
+
+    with mock.patch.dict(sys.modules, {"sounddevice": fake_sd}):
+        source = LineInSource(device=None, sample_rate=16000)
+        source.read(0.1)
+        source.close()
+
+        fake_stream.stop.assert_called_once()
+        fake_stream.close.assert_called_once()
+
+
+def test_line_in_source_works_as_context_manager():
+    fake_sd = types.ModuleType("sounddevice")
+    fake_stream = mock.MagicMock()
+    fake_stream.read.return_value = (np.zeros((1600, 1), dtype=np.float32), False)
+    fake_sd.InputStream = mock.MagicMock(return_value=fake_stream)
+
+    with mock.patch.dict(sys.modules, {"sounddevice": fake_sd}):
+        with LineInSource(device=None, sample_rate=16000) as source:
+            source.read(0.1)
+        fake_stream.stop.assert_called_once()
+        fake_stream.close.assert_called_once()
+
+
+def test_line_in_source_counts_overflows():
+    fake_sd = types.ModuleType("sounddevice")
+    fake_stream = mock.MagicMock()
+    fake_stream.read.side_effect = [
+        (np.zeros((1600, 1), dtype=np.float32), False),
+        (np.zeros((1600, 1), dtype=np.float32), True),
+        (np.zeros((1600, 1), dtype=np.float32), True),
+    ]
+    fake_sd.InputStream = mock.MagicMock(return_value=fake_stream)
+
+    with mock.patch.dict(sys.modules, {"sounddevice": fake_sd}):
+        source = LineInSource(device=None, sample_rate=16000)
+        assert source.overflow_count == 0
+        source.read(0.1)
+        assert source.overflow_count == 0
+        source.read(0.1)
+        assert source.overflow_count == 1
+        source.read(0.1)
+        assert source.overflow_count == 2
 
 
 def test_list_devices_uses_sounddevice_query():

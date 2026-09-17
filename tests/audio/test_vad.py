@@ -31,6 +31,28 @@ def test_calibrate_floor_returns_rms_dbfs_of_calibration_segment():
     assert floor == pytest.approx(rms_dbfs(noise))
 
 
+def test_compute_rms_windows_raises_on_non_dividing_window_sec():
+    sr = 16000
+    audio = np.zeros(sr, dtype=np.float32)
+    with pytest.raises(ValueError):
+        compute_rms_windows(audio, sr, window_sec=0.0333)
+
+
+def test_compute_rms_windows_accepts_evenly_dividing_window_sec():
+    sr = 16000
+    audio = np.zeros(sr, dtype=np.float32)
+    # 0.1s at 16000 Hz = 1600 samples exactly -- must not raise
+    windows = compute_rms_windows(audio, sr, window_sec=0.1)
+    assert windows.shape[0] == 10
+
+
+def test_silence_detector_rejects_non_finite_floor():
+    with pytest.raises(ValueError):
+        SilenceDetector(floor_dbfs=float("-inf"))
+    with pytest.raises(ValueError):
+        SilenceDetector(floor_dbfs=float("nan"))
+
+
 def _feed(detector: SilenceDetector, dbfs_sequence: list[float]) -> list["AudioEvent | None"]:
     return [detector.process_window(v) for v in dbfs_sequence]
 

@@ -53,3 +53,32 @@ def test_buffer_push_ignores_empty_arrays():
     buf = CircularAudioBuffer(sample_rate=16000, max_seconds=20.0)
     buf.push(np.zeros(0, dtype=np.float32))
     assert buf.duration_available == 0.0
+
+
+def test_buffer_read_last_returns_a_copy_not_a_view():
+    buf = CircularAudioBuffer(sample_rate=16000, max_seconds=20.0)
+    buf.push(np.full(16000, 1.0, dtype=np.float32))
+    result = buf.read_last(1.0)
+    result[:] = 42.0
+    # internal state must be untouched
+    assert np.all(buf.read_last(1.0) == 1.0)
+
+
+def test_buffer_rejects_non_positive_sample_rate():
+    with pytest.raises(ValueError):
+        CircularAudioBuffer(sample_rate=0, max_seconds=20.0)
+    with pytest.raises(ValueError):
+        CircularAudioBuffer(sample_rate=-16000, max_seconds=20.0)
+
+
+def test_buffer_rejects_non_positive_max_seconds():
+    with pytest.raises(ValueError):
+        CircularAudioBuffer(sample_rate=16000, max_seconds=0.0)
+    with pytest.raises(ValueError):
+        CircularAudioBuffer(sample_rate=16000, max_seconds=-1.0)
+
+
+def test_buffer_with_degenerate_tiny_capacity_stays_empty():
+    buf = CircularAudioBuffer(sample_rate=16000, max_seconds=0.00001)  # rounds to 0 samples
+    buf.push(np.full(16000, 1.0, dtype=np.float32))
+    assert buf.duration_available == 0.0

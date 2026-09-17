@@ -43,10 +43,10 @@ class FileSource:
         n = int(seconds * self._sample_rate)
         start = self._cursor
         end = min(start + n, len(self._audio))
-        chunk = self._audio[start:end]
+        chunk = self._audio[start:end].copy()
         self._cursor = end
         if self._realtime:
-            time.sleep(seconds)
+            time.sleep(len(chunk) / self._sample_rate)
         return chunk
 
 
@@ -61,10 +61,15 @@ class LineInSource:
         self._device = device
         self._sample_rate = sample_rate
         self._stream = None
+        self._overflow_count = 0
 
     @property
     def sample_rate(self) -> int:
         return self._sample_rate
+
+    @property
+    def overflow_count(self) -> int:
+        return self._overflow_count
 
     def _ensure_stream(self):
         if self._stream is None:
@@ -78,5 +83,19 @@ class LineInSource:
     def read(self, seconds: float) -> np.ndarray:
         self._ensure_stream()
         n = int(seconds * self._sample_rate)
-        data, _overflowed = self._stream.read(n)
+        data, overflowed = self._stream.read(n)
+        if overflowed:
+            self._overflow_count += 1
         return data[:, 0].astype(np.float32)
+
+    def close(self) -> None:
+        if self._stream is not None:
+            self._stream.stop()
+            self._stream.close()
+            self._stream = None
+
+    def __enter__(self) -> "LineInSource":
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
