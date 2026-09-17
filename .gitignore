@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Secrets
+.env
+
+# Generated / large media — never commit audio or lyrics
+data/
+*.mp3
+*.wav
+*.lrc
+lyrics_cache.sqlite3
+shazam_cache/
+
+# Editors
+.idea/
+.vscode/

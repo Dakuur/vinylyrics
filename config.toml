@@ -1,0 +1,7 @@
+[dev]
+sample_rate = 16000
+buffer_seconds = 20.0
+
+[pi]
+sample_rate = 16000
+buffer_seconds = 20.0
