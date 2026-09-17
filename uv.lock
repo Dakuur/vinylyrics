@@ -593,6 +593,18 @@ wheels = [
 ]
 
 [[package]]
+name = "lrclibapi"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cd/51/1456c67f14c66ca7700a1cb5f6c2c180f65b4be07c97018c175ff64babac/lrclibapi-0.3.1.tar.gz", hash = "sha256:6bc457725fb0fc9bb8939edaf112c0c79997504c54e9c04112c1740306a88088", size = 6238, upload-time = "2023-11-09T17:40:55.655Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/2d/e8ecdb1676b97e247f3e3da11f2ef0a6bb51fb4b4d4e93a5440be77f368d/lrclibapi-0.3.1-py3-none-any.whl", hash = "sha256:2c71dcfa1075521f426fe19acff7a7a9578842e1c1864fcc4638193b349bc8c7", size = 7453, upload-time = "2023-11-09T17:40:54.166Z" },
+]
+
+[[package]]
 name = "multidict"
 version = "6.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1561,6 +1573,7 @@ name = "vinylyrics"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "lrclibapi" },
     { name = "musicbrainzngs" },
     { name = "mutagen" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -1582,6 +1595,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "lrclibapi", specifier = ">=0.3.1" },
     { name = "musicbrainzngs", specifier = ">=0.7" },
     { name = "mutagen", specifier = ">=1.48" },
     { name = "numpy", specifier = ">=1.26" },

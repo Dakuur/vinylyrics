@@ -23,15 +23,16 @@ de la Fase 1 y está documentada en [docs/SPEC.md](SPEC.md#decisiones-tomadas-du
 
 Estas son las dependencias que la Fase 1 introdujo realmente en
 `pyproject.toml`. Ninguna otra librería mencionada en `docs/SPEC.md` (como
-`shazamio`, `lrclibapi`, `musicbrainzngs`, `colorthief`, `sounddevice` o
-`scipy`) forma parte del proyecto todavía; se añadirán a esta misma tabla
-cuando la fase correspondiente las incorpore.
+`colorthief` o `sounddevice`) forma parte del proyecto todavía; se añadirán a
+esta misma tabla cuando la fase correspondiente las incorpore.
 
 La Fase 2 (el vinylizer) añadió `numpy`, `pedalboard` y `soundfile` a esa
 misma tabla.
 
 La Fase 5 (reconocimiento) añadió `shazamio`, `musicbrainzngs` y `requests`
 a esa misma tabla.
+
+La Fase 6 (letras) añadió `lrclibapi` a esa misma tabla.
 
 | Paquete | Versión mínima | Licencia | Por qué |
 |---|---|---|---|
@@ -45,6 +46,7 @@ a esa misma tabla.
 | [`shazamio`](https://pypi.org/project/shazamio/) | ≥0.8.1 | MIT | Cliente de reconocimiento de Shazam (API no oficial — la especificación lo señala explícitamente). Se añadió antes en esta misma sesión para un script de prueba manual desechable (`scripts/try_recognize.py`) sin quedar registrado aquí en su momento; en esta fase pasa a ser una dependencia real y de peso (`ShazamIORecognizer`), así que se documenta ahora. |
 | [`musicbrainzngs`](https://pypi.org/project/musicbrainzngs/) | ≥0.7 | BSD 2-Clause | Busca el release de MusicBrainz de una pista (primero por ISRC, con búsqueda difusa por artista/título/álbum como respaldo) para obtener un ID de release con el que consultar Cover Art Archive. |
 | [`requests`](https://pypi.org/project/requests/) | ≥2.32 | Apache-2.0 | Una petición `HEAD` por cada candidato de Cover Art Archive para confirmar que la portada existe antes de devolver su URL. |
+| [`lrclibapi`](https://pypi.org/project/lrclibapi/) | — | MIT | Cliente de la API de LRCLIB (`/get` y luego `/search` como respaldo). Se eligió sobre la alternativa `lrcup` durante la investigación de reuso de la Fase 1: ninguna de las dos librerías parsea el texto LRC a pares `(ms, text)`, pero las excepciones tipadas de `lrclibapi` (`NotFoundError` en concreto) encajan mejor con el flujo de este proyecto de get-luego-search-como-respaldo — el parseo de LRC en sí está escrito a mano (`vinylyrics/lyrics/parser.py`), verificado contra contenido real de LRCLIB durante la planificación de la Fase 6. |
 
 Las licencias se han verificado contra los metadatos publicados en PyPI de
 cada paquete (`License-Expression` en su `METADATA`), no solo copiadas de
