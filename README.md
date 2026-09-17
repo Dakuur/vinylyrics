@@ -36,6 +36,16 @@ datos reales usados (pistas, offsets de velocidad, ruido). Opciones:
 - `--output-dir DIR`: carpeta de salida (por defecto `data/vinylizer_output`).
 - `--params PATH`: ruta a un TOML de parámetros alternativo.
 
+### Dispositivos de audio (para más adelante)
+
+Cuando haya una tarjeta USB conectada:
+
+```bash
+uv run scripts/list_audio_devices.py
+```
+
+Necesita `portaudio` instalado (`./scripts/setup-ubuntu.sh`).
+
 ## Licencia
 
 GPLv3 — ver [LICENSE](LICENSE). (Elegida por la dependencia `pedalboard`, que
