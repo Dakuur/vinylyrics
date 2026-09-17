@@ -622,7 +622,7 @@ def build_noise_layer(
 - [ ] **Step 5: Run to verify they pass**
 
 Run: `uv run pytest tests/vinylizer/test_noise.py -v`
-Expected: `10 passed`
+Expected: `9 passed`
 
 - [ ] **Step 6: Commit**
 
