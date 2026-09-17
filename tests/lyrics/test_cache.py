@@ -56,3 +56,25 @@ def test_cache_creates_db_file_if_missing(tmp_path: Path):
     assert not db_path.exists()
     LyricsCache(db_path)
     assert db_path.exists()
+
+
+def test_cache_usable_from_a_different_thread(tmp_path: Path):
+    import threading
+
+    cache = LyricsCache(tmp_path / "lyrics.sqlite3")
+    result = LyricsResult(synced_lines=(LyricLine(ms=0, text="hilo"),), plain_lyrics=None, instrumental=False)
+    errors = []
+
+    def worker():
+        try:
+            cache.set("Artist", "Title", 200.0, result)
+            fetched = cache.get("Artist", "Title", 200.0)
+            assert fetched == result
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join()
+
+    assert errors == []

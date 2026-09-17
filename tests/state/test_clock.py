@@ -63,3 +63,8 @@ def test_speed_is_clamped_to_configured_range():
     clock = PlaybackClock(config)
     clock.add_anchor(wall_time=0.0, position_sec=0.0, timeskew=0.5)  # absurd timeskew
     assert clock.speed == pytest.approx(1.03)
+
+
+def test_clock_config_rejects_invariant_violation():
+    with pytest.raises(ValueError):
+        ClockConfig(absorb_window_sec=2.0, min_speed=0.97, reject_threshold_sec=3.0)

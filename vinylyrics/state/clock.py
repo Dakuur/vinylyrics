@@ -17,6 +17,14 @@ class ClockConfig:
     absorb_window_sec: float = 4.0
     max_history: int = 8
 
+    def __post_init__(self) -> None:
+        if self.absorb_window_sec * self.min_speed <= self.reject_threshold_sec:
+            raise ValueError(
+                "absorb_window_sec * min_speed must exceed reject_threshold_sec, "
+                "otherwise a large accepted correction can make position() run "
+                "backwards while it's being absorbed"
+            )
+
 
 class PlaybackClock:
     def __init__(self, config: ClockConfig = ClockConfig()):
@@ -48,6 +56,20 @@ class PlaybackClock:
         return base
 
     def add_anchor(self, wall_time: float, position_sec: float, timeskew: float = 0.0) -> bool:
+        """Record a Shazam recognition anchor.
+
+        `wall_time` must be the wall-clock time at which the audio buffer that
+        produced this recognition was CAPTURED — e.g. the start of the
+        sliding window submitted for recognition — not the time the
+        recognition response arrived. Per spec §5, using arrival time instead
+        of capture time would make the position estimate lag by the full
+        recognition round-trip latency. `position_sec` is the position within
+        the track that the recognizer reported for that same buffer.
+
+        Returns True if the anchor was accepted, False if it implied an
+        unreasonably large jump (probable false match) and was ignored —
+        in which case speed/history/anchor state are left unchanged.
+        """
         cfg = self._config
 
         if not self.is_anchored:

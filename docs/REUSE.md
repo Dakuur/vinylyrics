@@ -23,15 +23,16 @@ de la Fase 1 y está documentada en [docs/SPEC.md](SPEC.md#decisiones-tomadas-du
 
 Estas son las dependencias que la Fase 1 introdujo realmente en
 `pyproject.toml`. Ninguna otra librería mencionada en `docs/SPEC.md` (como
-`shazamio`, `lrclibapi`, `musicbrainzngs`, `colorthief`, `sounddevice` o
-`scipy`) forma parte del proyecto todavía; se añadirán a esta misma tabla
-cuando la fase correspondiente las incorpore.
+`colorthief` o `sounddevice`) forma parte del proyecto todavía; se añadirán a
+esta misma tabla cuando la fase correspondiente las incorpore.
 
 La Fase 2 (el vinylizer) añadió `numpy`, `pedalboard` y `soundfile` a esa
 misma tabla.
 
 La Fase 5 (reconocimiento) añadió `shazamio`, `musicbrainzngs` y `requests`
 a esa misma tabla.
+
+La Fase 6 (letras) añadió `lrclibapi` a esa misma tabla.
 
 | Paquete | Versión mínima | Licencia | Por qué |
 |---|---|---|---|

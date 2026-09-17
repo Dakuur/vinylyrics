@@ -103,3 +103,34 @@ def test_fetch_prefers_instrumental_candidate_over_nothing():
     assert result is not None
     assert result.instrumental is True
     assert result.has_synced is False
+
+
+def test_fetch_falls_back_to_search_when_get_result_is_empty():
+    empty_get_result = _FakeLyricsItem(synced_lyrics=None, plain_lyrics=None, instrumental=False, duration=None)
+    api = _FakeApi(
+        get_result=empty_get_result,
+        search_results=[_FakeLyricsItem(synced_lyrics="[00:01.00]encontrado\n", duration=200.0)],
+    )
+    client = LrcLibClient(api=api)
+
+    result = client.fetch("Artist", "Title", "Album", 200.0)
+
+    assert api.search_calls == 1  # the empty /get result must not short-circuit the fallback
+    assert result is not None
+    assert result.synced_lines[0].text == "encontrado"
+
+
+def test_fetch_prefers_synced_candidate_over_closer_duration_plain_only():
+    api = _FakeApi(
+        get_raises=_not_found_error(),
+        search_results=[
+            _FakeLyricsItem(plain_lyrics="letra plana", duration=200.0),  # closest duration, but no sync
+            _FakeLyricsItem(synced_lyrics="[00:01.00]sincronizado\n", duration=205.0),  # farther, but synced
+        ],
+    )
+    client = LrcLibClient(api=api)
+
+    result = client.fetch("Artist", "Title", "Album", 200.0)
+
+    assert result.has_synced
+    assert result.synced_lines[0].text == "sincronizado"
