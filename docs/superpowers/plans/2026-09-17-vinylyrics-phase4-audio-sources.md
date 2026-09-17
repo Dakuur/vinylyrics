@@ -719,9 +719,12 @@ git commit -m "feat: add 20s circular audio buffer"
     `stopped_sec: float = 10.0`, `window_sec: float = 0.1`.
   - `class SilenceDetector`: `__init__(self, floor_dbfs: float, thresholds: SilenceThresholds = SilenceThresholds())`,
     `def process_window(self, window_dbfs: float) -> "AudioEvent | None"`, `@property def is_silent -> bool`.
-  - A later phase feeds `compute_rms_windows(buffer.read_last(...), sr)`'s
-    output one value at a time into `SilenceDetector.process_window` and
-    reacts to `TRACK_GAP`/`STOPPED`.
+  - A later phase computes RMS windows on each freshly-read `AudioSource.read()`
+    chunk (not on `CircularAudioBuffer.read_last()`'s repeated, overlapping
+    tail) and feeds those windows one at a time into
+    `SilenceDetector.process_window`; `CircularAudioBuffer` is for holding
+    recent audio for on-demand recognition windows, not for VAD's
+    window-by-window scanning.
 
 **Design note (why hysteresis has two thresholds, not one):** a single
 threshold flickers when the signal hovers right at the boundary (noise
@@ -733,8 +736,15 @@ changes nothing — this plan's `test_silence_detector_does_not_flap_within_hyst
 verifies exactly that.
 
 **Verified during planning:** all 7 tests below were run against this exact
-implementation and passed on the first attempt — no bugs found this time,
-unlike Task 2's tone-repeats-every-second test-design issue.
+implementation and passed on the first attempt. However, a real boundary-drift
+bug was later found during whole-branch review (not planning): `SilenceDetector`
+tracked elapsed silence duration by repeatedly doing `self._silence_elapsed +=
+t.window_sec`, and repeated float addition drifted below/above exact decimal
+targets (e.g. ten additions of `0.1` landed on `0.9999999999999999`, not
+`1.0`), silently excluding silence lasting exactly `gap_min_sec` /
+`gap_max_sec` / `stopped_sec` from the closed-interval checks. It was fixed by
+tracking an integer window count instead and multiplying by `window_sec` once
+at comparison time.
 
 - [ ] **Step 1: Write the failing tests**
 
