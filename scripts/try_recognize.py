@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Prueba manual: reconoce un fragmento de audio con Shazam y mide cuánto tarda.
-
-No es el módulo de reconocimiento definitivo (eso es la Fase 5, con caché,
-reintentos y política de llamadas) - esto es solo para probar rápido qué tal
-funciona shazamio contra tus propias canciones o contra un WAV del vinylizer.
+"""Prueba manual: reconoce un fragmento de audio con el módulo real de la
+Fase 5 (ShazamIORecognizer + caché en disco + portada vía MusicBrainz/Cover
+Art Archive) y mide cuánto tarda.
 
 Uso:
     uv run scripts/try_recognize.py "/home/dakur/Downloads/songs/Bonito.mp3"
@@ -13,15 +11,18 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import io
 import time
 from pathlib import Path
 
+import numpy as np
 import soundfile as sf
-from shazamio import Shazam
+
+from vinylyrics.recognition.cache import DiskRecognitionCache
+from vinylyrics.recognition.enrich import recognize_with_cover_art
+from vinylyrics.recognition.shazam import ShazamIORecognizer
 
 
-def extract_clip(path: Path, offset: float, duration: float) -> bytes:
+def extract_clip(path: Path, offset: float, duration: float) -> tuple[np.ndarray, int]:
     info = sf.info(path)
     sr = info.samplerate
     audio, _ = sf.read(
@@ -30,17 +31,7 @@ def extract_clip(path: Path, offset: float, duration: float) -> bytes:
     )
     if len(audio) == 0:
         raise ValueError(f"El offset {offset}s está más allá del final de {path.name} ({info.duration:.1f}s)")
-    buffer = io.BytesIO()
-    sf.write(buffer, audio, sr, format="WAV")
-    return buffer.getvalue()
-
-
-async def recognize(data: bytes) -> tuple[dict, float]:
-    shazam = Shazam()
-    start = time.monotonic()
-    result = await shazam.recognize(data)
-    elapsed = time.monotonic() - start
-    return result, elapsed
+    return audio.mean(axis=1).astype(np.float32), sr
 
 
 def main() -> int:
@@ -52,25 +43,27 @@ def main() -> int:
 
     path = Path(args.audio_file)
     print(f"Extrayendo {args.duration}s desde el segundo {args.offset} de {path.name}...")
-    clip = extract_clip(path, args.offset, args.duration)
+    clip, sr = extract_clip(path, args.offset, args.duration)
 
     print("Enviando a Shazam...")
-    result, elapsed = asyncio.run(recognize(clip))
+    cache = DiskRecognitionCache(Path("shazam_cache"))
+    recognizer = ShazamIORecognizer(cache=cache)
+
+    start = time.monotonic()
+    result = asyncio.run(recognize_with_cover_art(recognizer, clip, sr))
+    elapsed = time.monotonic() - start
 
     print(f"\nTiempo de reconocimiento: {elapsed:.2f}s")
 
-    track = result.get("track")
-    if not track:
+    if result is None:
         print("No identificado. Prueba con otro --offset (evita intros silenciosas o habladas).")
         return 1
 
-    print(f"Título:  {track.get('title')}")
-    print(f"Artista: {track.get('subtitle')}")
-
-    matches = result.get("matches", [])
-    if matches:
-        m = matches[0]
-        print(f"offset={m.get('offset')}  timeskew={m.get('timeskew')}  frequencyskew={m.get('frequencyskew')}")
+    print(f"Título:  {result.title}")
+    print(f"Artista: {result.artist}")
+    print(f"Álbum:   {result.album or '-'}")
+    print(f"Portada: {result.cover_url or '-'}")
+    print(f"offset={result.offset}  timeskew={result.timeskew}  frequencyskew={result.frequencyskew}")
 
     return 0
 
