@@ -30,6 +30,9 @@ cuando la fase correspondiente las incorpore.
 La Fase 2 (el vinylizer) añadió `numpy`, `pedalboard` y `soundfile` a esa
 misma tabla.
 
+La Fase 5 (reconocimiento) añadió `shazamio`, `musicbrainzngs` y `requests`
+a esa misma tabla.
+
 | Paquete | Versión mínima | Licencia | Por qué |
 |---|---|---|---|
 | [`mutagen`](https://pypi.org/project/mutagen/) | ≥1.48 | GPL-2.0-or-later | Lee y escribe etiquetas ID3 de los mp3. La especificación lo nombra directamente como la librería estándar en Python para esto, y el subcomando `inspect` depende de él para leer título, artista, álbum y duración. |
@@ -39,6 +42,9 @@ misma tabla.
 | [`numpy`](https://pypi.org/project/numpy/) | ≥1.26 | BSD-3-Clause | Matemática DSP del vinylizer: generación de LFOs, integración temporal acumulada para el remuestreo a velocidad variable, ruido rosa basado en FFT, y planificación de clics mediante un proceso de Poisson. |
 | [`pedalboard`](https://pypi.org/project/pedalboard/) (Spotify) | ≥0.9 | GPLv3 (ver la justificación de licencia de este proyecto, ya registrada más arriba en este documento) | Usada para `HighShelfFilter` (el rolloff a 12kHz del vinylizer), `HighpassFilter` (dar forma a los clics) y `LowpassFilter` (dar forma al rumble) — efectos de audio sobre JUCE, exactamente el reuso que pedía la especificación original en vez de biquads hechos a mano. |
 | [`soundfile`](https://pypi.org/project/soundfile/) | ≥0.13 | BSD-3-Clause | Lee los mp3 de origen directamente (confirmado durante la planificación de la Fase 2: el libsndfile 1.2.2 empaquetado decodifica MP3 de forma nativa, sin necesidad de un paso con ffmpeg/pydub para esta ruta) y escribe el WAV de salida. |
+| [`shazamio`](https://pypi.org/project/shazamio/) | ≥0.8.1 | MIT | Cliente de reconocimiento de Shazam (API no oficial — la especificación lo señala explícitamente). Se añadió antes en esta misma sesión para un script de prueba manual desechable (`scripts/try_recognize.py`) sin quedar registrado aquí en su momento; en esta fase pasa a ser una dependencia real y de peso (`ShazamIORecognizer`), así que se documenta ahora. |
+| [`musicbrainzngs`](https://pypi.org/project/musicbrainzngs/) | ≥0.7 | BSD 2-Clause | Busca el release de MusicBrainz de una pista (primero por ISRC, con búsqueda difusa por artista/título/álbum como respaldo) para obtener un ID de release con el que consultar Cover Art Archive. |
+| [`requests`](https://pypi.org/project/requests/) | ≥2.32 | Apache-2.0 | Una petición `HEAD` por cada candidato de Cover Art Archive para confirmar que la portada existe antes de devolver su URL. |
 
 Las licencias se han verificado contra los metadatos publicados en PyPI de
 cada paquete (`License-Expression` en su `METADATA`), no solo copiadas de
