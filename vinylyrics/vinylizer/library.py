@@ -44,10 +44,11 @@ def _load_one(path: Path) -> TrackMeta:
     audio = MutagenFile(path)
     duration = audio.info.length if audio is not None else None
 
+    field_values = {"title": title, "artist": artist}
     missing = tuple(
         field
-        for field, value in (("title", title), ("artist", artist))
-        if not value
+        for field in REQUIRED_FIELDS
+        if not field_values[field]
     )
 
     return TrackMeta(
