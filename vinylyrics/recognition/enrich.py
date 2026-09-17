@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 from vinylyrics.recognition.base import RecognitionResult, Recognizer
-from vinylyrics.recognition.cover_art import find_cover_url_async
+from vinylyrics.recognition.cover_art import find_cover_url_async, find_track_duration_async
 
 
 async def recognize_with_cover_art(
@@ -16,6 +16,11 @@ async def recognize_with_cover_art(
         return None
 
     better_cover = await find_cover_url_async(result.artist, result.title, result.album, result.isrc)
+    duration = await find_track_duration_async(result.artist, result.title, result.isrc)
+
+    updates = {}
     if better_cover:
-        return replace(result, cover_url=better_cover)
-    return result
+        updates["cover_url"] = better_cover
+    if duration is not None:
+        updates["duration"] = duration
+    return replace(result, **updates) if updates else result

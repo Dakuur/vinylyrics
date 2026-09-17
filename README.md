@@ -46,6 +46,31 @@ uv run scripts/list_audio_devices.py
 
 Necesita `portaudio` instalado (`./scripts/setup-ubuntu.sh`).
 
+## Correr el servidor en vivo
+
+```bash
+uv run vinylyrics-server
+```
+
+Por defecto escucha por el micrófono (`LineInSource`, dispositivo por
+defecto del sistema) y sirve en `http://0.0.0.0:8000` — cualquier
+dispositivo en la misma red (el proyector, un móvil, otro portátil) puede
+abrir esa URL en su navegador y ver las letras.
+
+**Probar sin tocadiscos:** pon música desde el altavoz de un móvil cerca
+del micrófono del portátil, y abre la URL de arriba desde el navegador del
+propio portátil o desde otro dispositivo en la misma WiFi.
+
+Opciones:
+
+- `--file RUTA.wav [--realtime]`: usa un WAV en vez del micrófono (útil
+  para probar sin audio real; `--realtime` respeta el reloj de pared en vez
+  de ir a máxima velocidad).
+- `--device N`: índice del dispositivo de entrada — ver
+  `uv run scripts/list_audio_devices.py`.
+- `--profile dev|pi`: perfil de `config.toml` (por defecto `dev`).
+- `--port N`: puerto HTTP (por defecto 8000).
+
 ## Licencia
 
 GPLv3 — ver [LICENSE](LICENSE). (Elegida por la dependencia `pedalboard`, que

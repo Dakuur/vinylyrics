@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vinylyrics</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #1a2733; cursor: none;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    transition: background-color 800ms ease;
+  }
+  #safe-area {
+    position: absolute; inset: 8%;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    overflow: hidden;
+  }
+  #status-line {
+    color: #f0ede8; font-weight: 600; font-size: clamp(1rem, 3vw, 2rem);
+    opacity: 0.8; text-align: center;
+  }
+  #track-line {
+    color: #f0ede8; font-weight: 600; font-size: clamp(1.2rem, 4vw, 2.5rem);
+    text-align: center; margin-top: 0.5em;
+  }
+  #lyrics-viewport {
+    width: 100%; overflow: hidden; text-align: center;
+    height: 27vh; /* exactly 3 lines (.lyric-line is 9vh): one dim previous
+                     line, the active line, and the next line — without an
+                     explicit height here, overflow:hidden clips nothing
+                     (verified live: a 40-line song rendered 8+ lines
+                     simultaneously instead of the windowed karaoke view
+                     spec §8 describes) since the container just grows to
+                     fit all of #lyrics-track's content. */
+  }
+  #lyrics-track {
+    display: flex; flex-direction: column; align-items: center;
+    transform: translateY(0); will-change: transform;
+    transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .lyric-line {
+    font-weight: 600; color: #f0ede8;
+    height: 9vh; display: flex; align-items: center; justify-content: center;
+    font-size: clamp(1rem, 5vw, 3rem);
+    opacity: 0.15; transform: scale(0.75);
+    transition: opacity 250ms ease, transform 250ms ease;
+  }
+  .lyric-line.active { opacity: 1; transform: scale(1); }
+  .lyric-line.next { opacity: 0.45; transform: scale(0.75); }
+</style>
+</head>
+<body>
+<div id="safe-area">
+  <div id="status-line" style="display:none"></div>
+  <div id="track-line" style="display:none"></div>
+  <div id="lyrics-viewport">
+    <div id="lyrics-track"></div>
+  </div>
+</div>
+<script>
+const STATUS_TEXT = {
+  IDLE: "esperando...",
+  LISTENING: "escuchando...",
+  UNIDENTIFIED: "no identificado",
+};
+
+let currentPayload = null;
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onmessage = (event) => {
+    currentPayload = JSON.parse(event.data);
+    render();
+  };
+  ws.onclose = () => setTimeout(connect, 1000);
+}
+
+function render() {
+  const payload = currentPayload;
+  if (!payload) return;
+
+  const statusEl = document.getElementById("status-line");
+  const trackEl = document.getElementById("track-line");
+  document.body.style.backgroundColor = payload.palette.bg;
+
+  if (payload.state === "PLAYING" && payload.track) {
+    statusEl.style.display = "none";
+    trackEl.style.display = "block";
+    trackEl.textContent = `${payload.track.title} — ${payload.track.artist}`;
+    trackEl.style.color = payload.palette.fg;
+  } else {
+    trackEl.style.display = "none";
+    statusEl.style.display = "block";
+    statusEl.textContent = STATUS_TEXT[payload.state] || "";
+    statusEl.style.color = payload.palette.fg;
+  }
+
+  renderLyrics(payload);
+}
+
+function currentLyricIndex(payload, nowMs) {
+  if (!payload.clock || !payload.lyrics || payload.lyrics.length === 0) return -1;
+  const elapsedSec = (nowMs / 1000) - payload.clock.anchor_wall;
+  const positionMs = payload.clock.anchor_ms + elapsedSec * payload.clock.speed * 1000;
+  let idx = -1;
+  for (let i = 0; i < payload.lyrics.length; i++) {
+    if (payload.lyrics[i].ms <= positionMs) idx = i;
+    else break;
+  }
+  return idx;
+}
+
+let lastRenderedIndex = -2;
+let lastRenderedTrackKey = null;
+
+function renderLyrics(payload) {
+  const track = document.getElementById("lyrics-track");
+  if (!payload.lyrics || payload.lyrics.length === 0) {
+    track.innerHTML = "";
+    lastRenderedTrackKey = null;
+    return;
+  }
+  // Rebuild whenever the TRACK changes, not just when the line count
+  // changes — verified live: two different songs whose lyrics happened to
+  // have the same number of lines left the OLD song's text on screen
+  // forever (only positions/highlighting kept updating), since a
+  // length-only check saw no reason to rebuild.
+  const trackKey = payload.track ? `${payload.track.title}|${payload.track.artist}` : null;
+  if (trackKey !== lastRenderedTrackKey) {
+    track.innerHTML = "";
+    for (const line of payload.lyrics) {
+      const div = document.createElement("div");
+      div.className = "lyric-line";
+      div.textContent = line.text;
+      div.style.color = payload.palette.fg;
+      track.appendChild(div);
+    }
+    lastRenderedTrackKey = trackKey;
+    lastRenderedIndex = -2;
+  }
+
+  const idx = currentLyricIndex(payload, Date.now());
+  if (idx === lastRenderedIndex) return;
+  lastRenderedIndex = idx;
+
+  // Center the active line in the 3-line window (see #lyrics-viewport's
+  // fixed height): shift up by (idx - 1) lines so the PREVIOUS line sits
+  // in the top slot, active in the middle, next in the bottom slot.
+  //
+  // Uses offsetHeight, NOT getBoundingClientRect().height: the latter
+  // reflects the CSS `transform: scale()` each .lyric-line carries
+  // (0.75 for everything but the active line, which is scale(1)) — verified
+  // live: measuring a scaled-down line's rendered height and using it as
+  // the per-line spacing under-shifts every offset by the same 25%,
+  // compounding with every line scrolled through (a 40-line test drifted
+  // ~345px off by line 20 — the "active" line ended up rendered entirely
+  // outside the visible window). offsetHeight is the LAYOUT box height,
+  // unaffected by transform, so it stays the true 9vh spacing regardless
+  // of which line is currently scaled up.
+  const lineHeight = track.children[0] ? track.children[0].offsetHeight : 0;
+  track.style.transform = `translateY(${-(idx - 1) * lineHeight}px)`;
+
+  Array.from(track.children).forEach((el, i) => {
+    el.classList.remove("active", "next");
+    if (i === idx) {
+      el.classList.add("active");
+      el.style.color = payload.palette.fg;
+    } else if (i === idx + 1) {
+      el.classList.add("next");
+      el.style.color = payload.palette.dim;
+    } else {
+      el.style.color = payload.palette.dim;
+    }
+  });
+}
+
+function tick() {
+  if (currentPayload) render();
+  requestAnimationFrame(tick);
+}
+
+connect();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

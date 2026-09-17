@@ -154,3 +154,59 @@ def test_find_cover_url_rejects_same_title_different_artist():
         url = cover_art.find_cover_url("Los Rodríguez", "Mucho mejor")
 
     assert url == "https://coverartarchive.org/release/right-artist-mbid/front"
+
+
+def test_find_track_duration_uses_isrc_when_available():
+    isrc_result = {"isrc": {"recording-list": [{"length": "238000"}]}}
+    with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", return_value=isrc_result) as isrc_mock, \
+         mock.patch.object(cover_art.mb, "search_recordings") as search_mock:
+        duration = cover_art.find_track_duration("Artist", "Title", isrc="ISRC1")
+
+    assert duration == 238.0
+    isrc_mock.assert_called_once()
+    search_mock.assert_not_called()
+
+
+def test_find_track_duration_falls_back_to_search_when_isrc_lookup_fails():
+    search_result = {
+        "recording-list": [
+            {"title": "Title", "artist-credit": [{"artist": {"name": "Artist"}}], "ext:score": "100", "length": "200000"},
+        ]
+    }
+    with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
+         mock.patch.object(cover_art.mb, "search_recordings", return_value=search_result) as search_mock:
+        duration = cover_art.find_track_duration("Artist", "Title")
+
+    assert duration == 200.0
+    search_mock.assert_called_once()
+
+
+def test_find_track_duration_skips_low_score_and_mismatched_results():
+    search_result = {
+        "recording-list": [
+            {"title": "Title", "artist-credit": [{"artist": {"name": "Artist"}}], "ext:score": "50", "length": "200000"},
+            {"title": "Different Song", "artist-credit": [{"artist": {"name": "Artist"}}], "ext:score": "100", "length": "999000"},
+            {"title": "Title", "artist-credit": [{"artist": {"name": "Artist"}}], "ext:score": "95", "length": "205000"},
+        ]
+    }
+    with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
+         mock.patch.object(cover_art.mb, "search_recordings", return_value=search_result):
+        duration = cover_art.find_track_duration("Artist", "Title")
+
+    assert duration == 205.0  # skips the low-score row and the title mismatch
+
+
+def test_find_track_duration_returns_none_when_nothing_matches():
+    with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
+         mock.patch.object(cover_art.mb, "search_recordings", return_value={"recording-list": []}):
+        duration = cover_art.find_track_duration("Artist", "Title")
+
+    assert duration is None
+
+
+def test_find_track_duration_handles_network_error_gracefully():
+    with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
+         mock.patch.object(cover_art.mb, "search_recordings", side_effect=cover_art.mb.MusicBrainzError("boom")):
+        duration = cover_art.find_track_duration("Artist", "Title")
+
+    assert duration is None
