@@ -37,4 +37,4 @@ def test_inspect_reports_full_and_missing_tracks(tmp_path: Path, capsys) -> None
     assert "good.mp3" in out
     assert "Good Song" in out
     assert "bad.mp3" in out
-    assert "excluid" in out.lower()  # summary mentions exclusion
+    assert "bad.mp3: faltan title, artist" in out  # actually excluded, not just mentioned
