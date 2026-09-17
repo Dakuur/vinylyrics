@@ -83,3 +83,15 @@ def test_websocket_broadcasts_on_session_change():
         updated = ws.receive_json()
         assert updated["state"] == DisplayState.PLAYING.value
         assert updated["track"]["title"] == "Bonito"
+
+
+def test_index_serves_the_web_page():
+    session = PlaybackSession()
+    app = create_app(session=session, engine=_fake_engine())
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "vinylyrics" in response.text
+    assert response.headers["content-type"].startswith("text/html")

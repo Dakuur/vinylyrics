@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import Callable
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 
 from vinylyrics.engine import Engine
 from vinylyrics.state.session import PlaybackSession
@@ -30,6 +32,12 @@ def create_app(session: PlaybackSession, engine: Engine, now_fn: Callable[[], fl
             task.add_done_callback(lambda t, ws=ws: clients.discard(ws) if t.exception() else None)
 
     app.state.broadcast = broadcast
+
+    _web_dir = Path(__file__).resolve().parent.parent / "web"
+
+    @app.get("/")
+    def index():
+        return FileResponse(_web_dir / "index.html")
 
     @app.get("/health")
     def health():
