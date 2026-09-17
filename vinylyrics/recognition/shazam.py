@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 
 import numpy as np
 import soundfile as sf
 
 from vinylyrics.recognition.base import RecognitionResult
 from vinylyrics.recognition.cache import DiskRecognitionCache, hash_audio
+
+_logger = logging.getLogger(__name__)
 
 
 def _to_wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
@@ -78,12 +81,18 @@ class ShazamIORecognizer:
         for attempt in range(self._max_retries):
             try:
                 response = await client.recognize(wav_bytes)
-            except Exception:
+            except Exception as exc:
+                _logger.warning(
+                    "Shazam recognize() failed (attempt %d/%d): %s",
+                    attempt + 1, self._max_retries, exc, exc_info=True,
+                )
                 if attempt < self._max_retries - 1:
                     await asyncio.sleep(self._backoff_base_sec * (2**attempt))
                     continue
                 return None
             else:
+                if not response.get("track"):
+                    _logger.debug("Shazam recognize(): no match for this fragment")
                 if self._cache is not None and response.get("track"):
                     self._cache.set(audio_hash, response)
                 return _parse_response(response)

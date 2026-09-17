@@ -2,7 +2,6 @@ import asyncio
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from vinylyrics.recognition.base import RecognitionResult
 from vinylyrics.recognition.cache import DiskRecognitionCache

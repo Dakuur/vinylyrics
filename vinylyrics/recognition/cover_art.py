@@ -28,6 +28,21 @@ def _mbids_from_isrc(isrc: str) -> list[str]:
     return mbids
 
 
+def _normalize(text: str) -> str:
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def _recording_matches(rec: dict, title: str, artist: str) -> bool:
+    if _normalize(rec.get("title", "")) != _normalize(title):
+        return False
+    artist_credits = [
+        credit.get("artist", {}).get("name", "")
+        for credit in rec.get("artist-credit", [])
+        if isinstance(credit, dict)
+    ]
+    return _normalize(artist) in [_normalize(a) for a in artist_credits]
+
+
 def _mbids_from_search(artist: str, title: str, album: "str | None" = None) -> list[str]:
     search_kwargs = {"recording": title, "artist": artist, "limit": 10}
     if album:
@@ -40,6 +55,8 @@ def _mbids_from_search(artist: str, title: str, album: "str | None" = None) -> l
     for rec in result.get("recording-list", []):
         score = int(rec.get("ext:score", 0))
         if score < MIN_SEARCH_SCORE:
+            continue
+        if not _recording_matches(rec, title, artist):
             continue
         for rel in rec.get("release-list", []):
             mbids.append(rel["id"])

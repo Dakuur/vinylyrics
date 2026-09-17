@@ -1,4 +1,3 @@
-# tests/recognition/test_cadence.py
 from vinylyrics.recognition.cadence import CadenceConfig, CallCadencePolicy
 
 
@@ -40,3 +39,18 @@ def test_locked_state_uses_resync_interval():
     policy.mark_call_finished()
     assert policy.should_call(now=10.0) is False
     assert policy.should_call(now=45.0) is True
+
+
+def test_track_gap_also_clears_locked_state():
+    policy = CallCadencePolicy(CadenceConfig(min_interval_sec=8.0, resync_interval_sec=45.0))
+    policy.set_locked(True)
+    policy.mark_call_started(now=0.0)
+    policy.mark_call_finished()
+
+    policy.on_track_gap()
+    policy.mark_call_started(now=1.0)
+    policy.mark_call_finished()
+
+    # after the gap, cadence should be back to the fast min_interval, not the slow resync interval
+    assert policy.should_call(now=1.0 + 8.0) is True
+    assert policy.should_call(now=1.0 + 7.0) is False

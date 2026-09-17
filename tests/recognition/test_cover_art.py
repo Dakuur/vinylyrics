@@ -25,7 +25,16 @@ def test_find_cover_url_falls_back_to_search_when_isrc_lookup_fails():
     with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
          mock.patch.object(
              cover_art.mb, "search_recordings",
-             return_value={"recording-list": [{"ext:score": "95", "release-list": [{"id": "mbid-from-search"}]}]},
+             return_value={
+                 "recording-list": [
+                     {
+                         "ext:score": "95",
+                         "title": "Title",
+                         "artist-credit": [{"artist": {"name": "Artist"}}],
+                         "release-list": [{"id": "mbid-from-search"}],
+                     }
+                 ]
+             },
          ) as search_mock, \
          mock.patch.object(cover_art.requests, "head", return_value=_fake_head_response(200)):
         url = cover_art.find_cover_url("Artist", "Title", isrc="US1234567890")
@@ -50,7 +59,12 @@ def test_find_cover_url_skips_low_score_search_results():
 def test_find_cover_url_tries_next_mbid_when_first_has_no_cover_art():
     search_result = {
         "recording-list": [
-            {"ext:score": "95", "release-list": [{"id": "mbid-no-art"}, {"id": "mbid-with-art"}]},
+            {
+                "ext:score": "95",
+                "title": "Title",
+                "artist-credit": [{"artist": {"name": "Artist"}}],
+                "release-list": [{"id": "mbid-no-art"}, {"id": "mbid-with-art"}],
+            },
         ]
     }
     with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
@@ -75,9 +89,68 @@ def test_find_cover_url_handles_network_error_gracefully():
     with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
          mock.patch.object(
              cover_art.mb, "search_recordings",
-             return_value={"recording-list": [{"ext:score": "95", "release-list": [{"id": "some-mbid"}]}]},
+             return_value={
+                 "recording-list": [
+                     {
+                         "ext:score": "95",
+                         "title": "Title",
+                         "artist-credit": [{"artist": {"name": "Artist"}}],
+                         "release-list": [{"id": "some-mbid"}],
+                     }
+                 ]
+             },
          ), \
          mock.patch.object(cover_art.requests, "head", side_effect=cover_art.requests.RequestException("timeout")):
         url = cover_art.find_cover_url("Artist", "Title")
 
     assert url is None
+
+
+def test_find_cover_url_rejects_wrong_song_despite_high_score():
+    search_result = {
+        "recording-list": [
+            {
+                "ext:score": "100",
+                "title": "El Bosque de Palo",
+                "artist-credit": [{"artist": {"name": "Jarabe de Palo"}}],
+                "release-list": [{"id": "wrong-song-mbid"}],
+            },
+            {
+                "ext:score": "99",
+                "title": "Bonito",
+                "artist-credit": [{"artist": {"name": "Jarabe de Palo"}}],
+                "release-list": [{"id": "right-song-mbid"}],
+            },
+        ]
+    }
+    with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
+         mock.patch.object(cover_art.mb, "search_recordings", return_value=search_result), \
+         mock.patch.object(cover_art.requests, "head", return_value=_fake_head_response(200)):
+        url = cover_art.find_cover_url("Jarabe de Palo", "Bonito")
+
+    assert url == "https://coverartarchive.org/release/right-song-mbid/front"
+
+
+def test_find_cover_url_rejects_same_title_different_artist():
+    search_result = {
+        "recording-list": [
+            {
+                "ext:score": "100",
+                "title": "Mucho mejor",
+                "artist-credit": [{"artist": {"name": "Los Argentinos"}}],
+                "release-list": [{"id": "wrong-artist-mbid"}],
+            },
+            {
+                "ext:score": "91",
+                "title": "Mucho mejor",
+                "artist-credit": [{"artist": {"name": "Los Rodríguez"}}],
+                "release-list": [{"id": "right-artist-mbid"}],
+            },
+        ]
+    }
+    with mock.patch.object(cover_art.mb, "get_recordings_by_isrc", side_effect=cover_art.mb.ResponseError("404")), \
+         mock.patch.object(cover_art.mb, "search_recordings", return_value=search_result), \
+         mock.patch.object(cover_art.requests, "head", return_value=_fake_head_response(200)):
+        url = cover_art.find_cover_url("Los Rodríguez", "Mucho mejor")
+
+    assert url == "https://coverartarchive.org/release/right-artist-mbid/front"

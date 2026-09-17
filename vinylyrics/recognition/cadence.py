@@ -18,6 +18,7 @@ class CallCadencePolicy:
 
     def on_track_gap(self) -> None:
         self._last_call_at = None
+        self._locked = False
 
     def set_locked(self, locked: bool) -> None:
         self._locked = locked
