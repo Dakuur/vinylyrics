@@ -1222,8 +1222,8 @@ Expected: `7 passed`
 - [ ] **Step 6: Run the full suite**
 
 Run: `uv run pytest -v`
-Expected: all tests pass (Phase 1's 4 + Task 1's 6 + Task 2's 10 + Task 3's
-2 + Task 4's 7 = 29 total).
+Expected: all tests pass (Phase 1's 4 + Task 1's 6 + Task 2's 9 + Task 3's
+2 + Task 4's 7 = 28 total).
 
 - [ ] **Step 7: Commit**
 
