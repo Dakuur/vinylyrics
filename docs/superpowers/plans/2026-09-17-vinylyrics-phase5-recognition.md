@@ -71,14 +71,19 @@ sliding-window loop is itself a *later* phase's job (see Roadmap Context).
   timestamps and a locked/in-flight flag and answers "should I call now?" —
   wiring it to an actual `AudioSource`/`Recognizer` loop is later-phase
   orchestration work, out of scope here (see Roadmap Context).
-- **Cover art lookup assumes clean, already-Shazam-identified artist/title
-  strings, not raw/unverified input.** MusicBrainz's fuzzy search can match
-  garbage input against unrelated recordings (verified during planning —
-  feeding it a nonsense string still returned a "confident" 100/100-scored
-  false match on an embedded number). A `MIN_SEARCH_SCORE = 90` filter is a
-  cheap safety net, not a guarantee; it's acceptable because in real use
-  this function is only ever called with a title/artist Shazam already
-  confirmed, not arbitrary text.
+- **`ext:score` alone is not enough to trust a MusicBrainz search result —
+  it carries no title/artist signal.** Found during final review: even
+  clean, Shazam-confirmed input could return the wrong song's cover art,
+  contradicting this plan's original assumption that a `MIN_SEARCH_SCORE =
+  90` threshold was an adequate safety net. Reproduced live:
+  `find_cover_url("Jarabe de Palo", "Bonito")` returned the cover of an
+  unrelated recording, "El Bosque de Palo" (scored 100, outranking the real
+  "Bonito" recordings at 99); separately, searching "Mucho Mejor" by title
+  alone matched several unrelated bands' same-titled songs, showing title
+  alone isn't sufficient either — artist has to match too. Fixed by adding
+  `_recording_matches`, a normalized title+artist equality check applied in
+  `_mbids_from_search` in addition to (not instead of) the `MIN_SEARCH_SCORE`
+  threshold.
 - **`docs/REUSE.md` gets `shazamio` retroactively (it was added mid-session
   without being logged there — a process gap this plan closes) plus
   `musicbrainzngs` and `requests` as they're introduced — Task 6, not
