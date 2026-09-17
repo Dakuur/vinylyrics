@@ -42,7 +42,7 @@ class SilenceDetector:
         self._floor = floor_dbfs
         self._thresholds = thresholds
         self._is_silent = False
-        self._silence_elapsed = 0.0
+        self._silence_windows = 0
         self._stopped_fired = False
 
     @property
@@ -57,20 +57,21 @@ class SilenceDetector:
         if not self._is_silent:
             if window_dbfs < enter_threshold:
                 self._is_silent = True
-                self._silence_elapsed = t.window_sec
+                self._silence_windows = 1
                 self._stopped_fired = False
             return None
 
         if window_dbfs > exit_threshold:
-            duration = self._silence_elapsed
+            duration = self._silence_windows * t.window_sec
             self._is_silent = False
-            self._silence_elapsed = 0.0
+            self._silence_windows = 0
             if t.gap_min_sec <= duration <= t.gap_max_sec:
                 return AudioEvent.TRACK_GAP
             return None
 
-        self._silence_elapsed += t.window_sec
-        if self._silence_elapsed >= t.stopped_sec and not self._stopped_fired:
+        self._silence_windows += 1
+        duration = self._silence_windows * t.window_sec
+        if duration >= t.stopped_sec and not self._stopped_fired:
             self._stopped_fired = True
             return AudioEvent.STOPPED
         return None

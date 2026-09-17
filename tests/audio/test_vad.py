@@ -105,3 +105,33 @@ def test_silence_detector_medium_silence_produces_no_gap_event():
 
     fired = [e for e in events if e is not None]
     assert fired == []
+
+
+def test_silence_detector_handles_exact_boundary_durations():
+    thresholds = SilenceThresholds(
+        enter_offset_db=6.0, exit_offset_db=10.0,
+        gap_min_sec=1.0, gap_max_sec=3.0, stopped_sec=10.0, window_sec=0.1,
+    )
+    floor = -60.0
+    loud = floor + 20.0
+    silent = floor - 5.0
+
+    # Exactly gap_min_sec (1.0s = 10 windows) -> TRACK_GAP
+    detector = SilenceDetector(floor_dbfs=floor, thresholds=thresholds)
+    events = _feed(detector, [loud] * 5)
+    events += _feed(detector, [silent] * 10)
+    events += _feed(detector, [loud] * 5)
+    assert [e for e in events if e is not None] == [AudioEvent.TRACK_GAP]
+
+    # Exactly gap_max_sec (3.0s = 30 windows) -> TRACK_GAP
+    detector = SilenceDetector(floor_dbfs=floor, thresholds=thresholds)
+    events = _feed(detector, [loud] * 5)
+    events += _feed(detector, [silent] * 30)
+    events += _feed(detector, [loud] * 5)
+    assert [e for e in events if e is not None] == [AudioEvent.TRACK_GAP]
+
+    # Exactly stopped_sec (10.0s = 100 windows) -> STOPPED
+    detector = SilenceDetector(floor_dbfs=floor, thresholds=thresholds)
+    events = _feed(detector, [loud] * 5)
+    events += _feed(detector, [silent] * 100)
+    assert [e for e in events if e is not None] == [AudioEvent.STOPPED]
