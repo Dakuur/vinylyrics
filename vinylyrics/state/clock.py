@@ -44,6 +44,14 @@ class PlaybackClock:
     def speed(self) -> float:
         return self._speed
 
+    @property
+    def anchor_wall(self) -> "float | None":
+        return self._anchor_wall
+
+    @property
+    def anchor_position(self) -> "float | None":
+        return self._anchor_position
+
     def position(self, now: float) -> "float | None":
         if not self.is_anchored:
             return None

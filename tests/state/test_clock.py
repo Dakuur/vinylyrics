@@ -68,3 +68,13 @@ def test_speed_is_clamped_to_configured_range():
 def test_clock_config_rejects_invariant_violation():
     with pytest.raises(ValueError):
         ClockConfig(absorb_window_sec=2.0, min_speed=0.97, reject_threshold_sec=3.0)
+
+
+def test_anchor_wall_and_anchor_position_are_exposed_publicly():
+    clock = PlaybackClock()
+    assert clock.anchor_wall is None
+    assert clock.anchor_position is None
+
+    clock.add_anchor(wall_time=100.0, position_sec=30.0, timeskew=0.0)
+    assert clock.anchor_wall == 100.0
+    assert clock.anchor_position == 30.0

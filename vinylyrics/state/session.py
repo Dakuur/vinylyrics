@@ -71,8 +71,8 @@ class PlaybackSession:
         clock_payload = None
         if self._clock is not None and self._clock.is_anchored:
             clock_payload = {
-                "anchor_wall": self._clock._anchor_wall,
-                "anchor_ms": self._clock._anchor_position * 1000.0,
+                "anchor_wall": self._clock.anchor_wall,
+                "anchor_ms": self._clock.anchor_position * 1000.0,
                 "speed": self._clock.speed,
             }
 
