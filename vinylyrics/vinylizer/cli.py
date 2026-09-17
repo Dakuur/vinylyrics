@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
+import numpy as np
+
+from vinylyrics.vinylizer.build import build_side, partition_tracks, select_tracks, write_side
 from vinylyrics.vinylizer.library import TrackMeta, scan_library
+from vinylyrics.vinylizer.params import load_params
 
 
 def _format_duration(seconds: float | None) -> str:
@@ -47,6 +52,43 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_build(args: argparse.Namespace) -> int:
+    if args.all and args.dry:
+        print("--all y --dry no se pueden combinar.")
+        return 1
+
+    tracks = scan_library(Path(args.directory))
+    rng = np.random.default_rng(args.seed)
+    params = load_params(Path(args.params) if args.params else None)
+    output_dir = Path(args.output_dir)
+
+    if args.dry:
+        selected = select_tracks(tracks, 3, rng)
+        audio, truth = build_side(selected, params, rng, max_track_seconds=30.0)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        wav_path = output_dir / "dry.wav"
+        json_path = output_dir / "dry.truth.json"
+        import soundfile as sf
+        sf.write(wav_path, audio, truth["sample_rate"])
+        json_path.write_text(json.dumps(truth, indent=2, ensure_ascii=False))
+        print(f"Generado {wav_path} ({truth['duration_sec']:.1f}s, {len(selected)} pistas)")
+        return 0
+
+    if args.all:
+        groups = partition_tracks(tracks, args.tracks, rng)
+        for i, group in enumerate(groups, start=1):
+            audio, truth = build_side(group, params, rng)
+            wav_path, _ = write_side(audio, truth, output_dir, i)
+            print(f"Generado {wav_path} ({truth['duration_sec']:.1f}s, {len(group)} pistas)")
+        return 0
+
+    selected = select_tracks(tracks, args.tracks, rng)
+    audio, truth = build_side(selected, params, rng)
+    wav_path, _ = write_side(audio, truth, output_dir, 1)
+    print(f"Generado {wav_path} ({truth['duration_sec']:.1f}s, {len(selected)} pistas)")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vinylizer")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -54,6 +96,16 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect", help="Muestra el estado de los metadatos ID3 de una carpeta")
     inspect_parser.add_argument("directory", help="Carpeta con archivos .mp3")
     inspect_parser.set_defaults(func=_cmd_inspect)
+
+    build_parser = subparsers.add_parser("build", help="Genera un WAV que simula una cara de vinilo")
+    build_parser.add_argument("directory", help="Carpeta con archivos .mp3")
+    build_parser.add_argument("--tracks", type=int, default=6, help="Pistas por cara (por defecto 6)")
+    build_parser.add_argument("--all", action="store_true", help="Reparte todas las pistas usables en varias caras")
+    build_parser.add_argument("--dry", action="store_true", help="Genera ~90s de prueba (3 fragmentos de 30s)")
+    build_parser.add_argument("--seed", type=int, default=None, help="Semilla para reproducibilidad")
+    build_parser.add_argument("--output-dir", default="data/vinylizer_output", help="Carpeta de salida")
+    build_parser.add_argument("--params", default=None, help="Ruta a un TOML de parámetros alternativo")
+    build_parser.set_defaults(func=_cmd_build)
 
     return parser
 
