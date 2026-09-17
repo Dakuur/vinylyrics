@@ -34,6 +34,9 @@ a esa misma tabla.
 
 La Fase 6 (letras) añadió `lrclibapi` a esa misma tabla.
 
+La Fase 7 (servidor + interfaz) añadió `Pillow`, `fastapi` y `uvicorn` a esa
+misma tabla.
+
 | Paquete | Versión mínima | Licencia | Por qué |
 |---|---|---|---|
 | [`mutagen`](https://pypi.org/project/mutagen/) | ≥1.48 | GPL-2.0-or-later | Lee y escribe etiquetas ID3 de los mp3. La especificación lo nombra directamente como la librería estándar en Python para esto, y el subcomando `inspect` depende de él para leer título, artista, álbum y duración. |
@@ -47,6 +50,9 @@ La Fase 6 (letras) añadió `lrclibapi` a esa misma tabla.
 | [`musicbrainzngs`](https://pypi.org/project/musicbrainzngs/) | ≥0.7 | BSD 2-Clause | Busca el release de MusicBrainz de una pista (primero por ISRC, con búsqueda difusa por artista/título/álbum como respaldo) para obtener un ID de release con el que consultar Cover Art Archive. |
 | [`requests`](https://pypi.org/project/requests/) | ≥2.32 | Apache-2.0 | Una petición `HEAD` por cada candidato de Cover Art Archive para confirmar que la portada existe antes de devolver su URL. |
 | [`lrclibapi`](https://pypi.org/project/lrclibapi/) | — | MIT | Cliente de la API de LRCLIB (`/get` y luego `/search` como respaldo). Se eligió sobre la alternativa `lrcup` durante la investigación de reuso de la Fase 1: ninguna de las dos librerías parsea el texto LRC a pares `(ms, text)`, pero las excepciones tipadas de `lrclibapi` (`NotFoundError` en concreto) encajan mejor con el flujo de este proyecto de get-luego-search-como-respaldo — el parseo de LRC en sí está escrito a mano (`vinylyrics/lyrics/parser.py`), verificado contra contenido real de LRCLIB durante la planificación de la Fase 6. |
+| [`Pillow`](https://pypi.org/project/Pillow/) | ≥10.0 | HPND (permisiva, estilo BSD) | Mantenida activamente (a diferencia de `colorthief`, la otra opción que sugería la especificación para este trabajo, cuyo último release en PyPI fue en 2017 — confirmado durante la planificación de la Fase 7). Usada para la extracción de color dominante basada en `Image.quantize()` a partir de la portada, en `vinylyrics/palette.py`. |
+| [`fastapi`](https://pypi.org/project/fastapi/) | ≥0.115 | MIT | El framework de servidor que nombra directamente el §6 de la especificación; provee el endpoint WebSocket, `/health` y `/debug`. |
+| [`uvicorn`](https://pypi.org/project/uvicorn/) (extra `[standard]`) | ≥0.30 | BSD-3-Clause | Servidor ASGI que ejecuta de verdad la app de FastAPI. |
 
 Las licencias se han verificado contra los metadatos publicados en PyPI de
 cada paquete (`License-Expression` en su `METADATA`), no solo copiadas de
