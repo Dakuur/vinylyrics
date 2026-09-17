@@ -16,6 +16,7 @@ class RecognitionResult:
     timeskew: "float | None"
     frequencyskew: "float | None"
     isrc: "str | None"
+    duration: "float | None" = None
 
 
 class Recognizer(Protocol):

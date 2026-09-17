@@ -90,3 +90,41 @@ async def find_cover_url_async(
     artist: str, title: str, album: "str | None" = None, isrc: "str | None" = None
 ) -> "str | None":
     return await asyncio.to_thread(find_cover_url, artist, title, album, isrc)
+
+
+def _duration_sec_from_recording(rec: dict) -> "float | None":
+    length_ms = rec.get("length")
+    return float(length_ms) / 1000.0 if length_ms else None
+
+
+def find_track_duration(artist: str, title: str, isrc: "str | None" = None) -> "float | None":
+    if isrc:
+        try:
+            result = mb.get_recordings_by_isrc(isrc)
+        except mb.MusicBrainzError:
+            result = None
+        if result:
+            for rec in result.get("isrc", {}).get("recording-list", []):
+                duration = _duration_sec_from_recording(rec)
+                if duration is not None:
+                    return duration
+
+    try:
+        result = mb.search_recordings(recording=title, artist=artist, limit=10)
+    except mb.MusicBrainzError:
+        return None
+
+    for rec in result.get("recording-list", []):
+        score = int(rec.get("ext:score", 0))
+        if score < MIN_SEARCH_SCORE:
+            continue
+        if not _recording_matches(rec, title, artist):
+            continue
+        duration = _duration_sec_from_recording(rec)
+        if duration is not None:
+            return duration
+    return None
+
+
+async def find_track_duration_async(artist: str, title: str, isrc: "str | None" = None) -> "float | None":
+    return await asyncio.to_thread(find_track_duration, artist, title, isrc)
