@@ -131,3 +131,30 @@ def test_on_track_gap_does_not_clear_the_current_track():
     payload = session.to_payload(now=0.0)
     assert payload["state"] == DisplayState.PLAYING
     assert payload["track"]["title"] == "Bonito"
+
+
+def test_on_recognized_without_explicit_palette_uses_fallback():
+    from vinylyrics.palette import FALLBACK_PALETTE
+
+    session = PlaybackSession()
+    session.on_recognized(_result(), _lyrics(), wall_time=0.0)
+    payload = session.to_payload(now=0.0)
+    assert payload["palette"]["bg"] == FALLBACK_PALETTE.bg
+
+
+def test_on_recognized_uses_explicit_palette_when_given():
+    from vinylyrics.palette import Palette
+
+    session = PlaybackSession()
+    custom = Palette(bg="#112233", fg="#f0ede8", dim="#556677")
+    session.on_recognized(_result(), _lyrics(), wall_time=0.0, palette=custom)
+    payload = session.to_payload(now=0.0)
+    assert payload["palette"]["bg"] == "#112233"
+
+
+def test_is_same_track_reflects_current_track():
+    session = PlaybackSession()
+    assert session.is_same_track(_result(title="Bonito")) is False
+    session.on_recognized(_result(title="Bonito"), _lyrics(), wall_time=0.0)
+    assert session.is_same_track(_result(title="Bonito")) is True
+    assert session.is_same_track(_result(title="Other")) is False

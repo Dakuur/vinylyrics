@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import logging
 import tomllib
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
@@ -18,6 +21,8 @@ from vinylyrics.server.app import create_app
 from vinylyrics.state.session import PlaybackSession
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config.toml"
+
+logger = logging.getLogger(__name__)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -57,12 +62,33 @@ def main() -> int:
         source=source, recognizer=recognizer, lyrics_service=lyrics_service,
         session=session, on_change=lambda: app.state.broadcast(),
     )
-    app = create_app(session=session, engine=engine)
 
-    @app.on_event("startup")
-    async def _start_engine():
-        import asyncio
-        asyncio.ensure_future(engine.run())
+    @asynccontextmanager
+    async def lifespan(app):
+        task = asyncio.ensure_future(engine.run())
+        app.state.engine_task = task
+
+        def _on_engine_done(t: "asyncio.Task") -> None:
+            if t.cancelled():
+                return
+            exc = t.exception()
+            if exc is not None:
+                logger.error("engine.run() crashed", exc_info=exc)
+                app.state.engine_error = exc
+
+        task.add_done_callback(_on_engine_done)
+        try:
+            yield
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            if hasattr(source, "close"):
+                source.close()
+
+    app = create_app(session=session, engine=engine, lifespan=lifespan)
 
     uvicorn.run(app, host=args.host, port=args.port)
     return 0

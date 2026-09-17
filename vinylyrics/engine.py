@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from dataclasses import dataclass
 from typing import Callable, Protocol
@@ -11,6 +12,7 @@ from vinylyrics.audio.buffer import CircularAudioBuffer
 from vinylyrics.audio.levels import rms_dbfs
 from vinylyrics.audio.vad import AudioEvent, SilenceDetector, SilenceThresholds, calibrate_floor
 from vinylyrics.lyrics.service import LyricsService
+from vinylyrics.palette import extract_palette
 from vinylyrics.recognition.base import Recognizer
 from vinylyrics.recognition.cadence import CadenceConfig, CallCadencePolicy
 from vinylyrics.recognition.enrich import recognize_with_cover_art
@@ -42,7 +44,7 @@ class Engine:
         thresholds: SilenceThresholds = SilenceThresholds(),
         cadence_config: CadenceConfig = CadenceConfig(),
         config: EngineConfig = EngineConfig(),
-        now_fn: Callable[[], float] = time.monotonic,
+        now_fn: Callable[[], float] = time.time,
     ):
         self._source = source
         self._recognizer = recognizer
@@ -63,10 +65,11 @@ class Engine:
 
     def debug_snapshot(self) -> dict:
         clock = self._session._clock
+        rms = self._last_rms_dbfs
         return {
             "last_recognition": self._last_recognition,
             "speed": clock.speed if clock is not None and clock.is_anchored else None,
-            "rms_dbfs": self._last_rms_dbfs,
+            "rms_dbfs": rms if math.isfinite(rms) else None,
             "anchor_history": list(clock._history) if clock is not None else [],
         }
 
@@ -137,10 +140,16 @@ class Engine:
 
         lyrics = None
         if result.duration is not None:
-            lyrics = self._lyrics_service.get_lyrics(result.artist, result.title, result.album, result.duration)
+            lyrics = await asyncio.to_thread(
+                self._lyrics_service.get_lyrics, result.artist, result.title, result.album, result.duration
+            )
+
+        palette = None
+        if not self._session.is_same_track(result):
+            palette = await asyncio.to_thread(extract_palette, result.cover_url)
 
         # anchor_wall marks when the recognized BUFFER STARTED, not when the
         # response arrived — spec §5's latency-subtraction requirement.
         anchor_wall = called_at - self._config.recognition_window_sec
-        self._session.on_recognized(result, lyrics, wall_time=anchor_wall)
+        self._session.on_recognized(result, lyrics, wall_time=anchor_wall, palette=palette)
         self._on_change()

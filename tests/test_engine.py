@@ -87,17 +87,16 @@ def _no_real_network_enrichment():
     # Engine._recognize_and_update calls the REAL recognize_with_cover_art,
     # which — whenever a test's fake recognizer returns a non-None result —
     # goes on to call the REAL find_cover_url_async/find_track_duration_async
-    # against MusicBrainz. Verified live during planning: without this,
-    # several of this file's tests silently made real network calls (one
-    # measured at 7+ seconds, occasionally flaky depending on network
-    # conditions) despite this being part of the OFFLINE suite. These are
-    # the same two functions Task 1's own enrich tests mock, for the same
-    # reason — applied here too since the engine exercises the same code
-    # path.
+    # against MusicBrainz. It also now calls the REAL extract_palette (added
+    # in this fix wave, wrapped in asyncio.to_thread) whenever a recognition
+    # represents a track change. All three are mocked here for the same
+    # reason: keeping this file's tests genuinely offline and fast.
     with mock.patch(
         "vinylyrics.recognition.enrich.find_cover_url_async", new=mock.AsyncMock(return_value=None)
     ), mock.patch(
         "vinylyrics.recognition.enrich.find_track_duration_async", new=mock.AsyncMock(return_value=None)
+    ), mock.patch(
+        "vinylyrics.engine.extract_palette", return_value=None
     ):
         yield
 
@@ -218,6 +217,59 @@ def test_debug_snapshot_reports_last_recognition_and_speed():
     assert snapshot["speed"] == pytest.approx(1.01)
     assert "rms_dbfs" in snapshot
     assert isinstance(snapshot["anchor_history"], list)
+
+
+def test_default_now_fn_produces_a_real_epoch_anchor_wall_not_monotonic():
+    # Regression test for a real bug found in final review: Engine's now_fn
+    # previously defaulted to time.monotonic (seconds since boot), while
+    # the browser (index.html) computes elapsed time against Date.now()
+    # (Unix epoch ms). The mismatch is ~1.79 BILLION seconds on any real
+    # machine, which silently pinned the displayed lyric to the last line
+    # of every song, forever. This test exercises Engine's actual DEFAULT
+    # now_fn (no override) and asserts the anchor lands within a real,
+    # narrow epoch-time window — time.monotonic() would fail this by many
+    # orders of magnitude.
+    import time as time_module
+
+    sr = 16000
+    result = RecognitionResult(
+        title="Song", artist="Artist", album=None, cover_url=None,
+        offset=0.0, timeskew=0.0, frequencyskew=0.0, isrc=None, duration=None,
+    )
+    source = _FakeSource([_quiet_chunk(sr, 3.0)] + [_loud_chunk(sr, 0.1)] * 3, sample_rate=sr)
+    session = PlaybackSession()
+    before = time_module.time()
+
+    engine = Engine(
+        source=source, recognizer=_FakeRecognizer(result), lyrics_service=_FakeLyricsService(None),
+        session=session, on_change=lambda: None,
+        # deliberately NOT overriding now_fn here — this exercises the real default
+    )
+    _run_engine_until_cancelled(engine)
+    after = time_module.time()
+
+    payload = session.to_payload(now=0.0)
+    anchor_wall = payload["clock"]["anchor_wall"]
+    # generous window (the whole test run plus the engine's own 12s
+    # recognition_window_sec subtraction) — time.monotonic() would be off
+    # by ~1.79 billion seconds, so even a wide window here is discriminating
+    assert before - 20 <= anchor_wall <= after
+
+
+def test_debug_snapshot_reports_none_rms_when_no_finite_reading_yet():
+    import json
+
+    sr = 16000
+    source = _FakeSource([], sample_rate=sr)  # never even reaches calibration in this test
+    session = PlaybackSession()
+    engine = Engine(
+        source=source, recognizer=_FakeRecognizer(None), lyrics_service=_FakeLyricsService(None),
+        session=session, on_change=lambda: None, now_fn=_FakeClock(),
+    )
+    # engine constructed but never run — _last_rms_dbfs is still its -inf default
+    snapshot = engine.debug_snapshot()
+    assert snapshot["rms_dbfs"] is None
+    json.dumps(snapshot)  # must not raise — this is what /debug actually does
 
 
 class _EofSource:

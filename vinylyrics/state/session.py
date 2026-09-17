@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 
 from vinylyrics.lyrics.base import LyricsResult
-from vinylyrics.palette import FALLBACK_PALETTE, Palette, extract_palette
+from vinylyrics.palette import FALLBACK_PALETTE, Palette
 from vinylyrics.recognition.base import RecognitionResult
 from vinylyrics.state.clock import ClockConfig, PlaybackClock
 
@@ -31,10 +31,19 @@ class PlaybackSession:
     def on_listening_started(self) -> None:
         self._state = DisplayState.LISTENING
 
-    def on_recognized(self, result: RecognitionResult, lyrics: "LyricsResult | None", wall_time: float) -> None:
+    def is_same_track(self, result: RecognitionResult) -> bool:
+        return _same_track(self._track, result)
+
+    def on_recognized(
+        self,
+        result: RecognitionResult,
+        lyrics: "LyricsResult | None",
+        wall_time: float,
+        palette: "Palette | None" = None,
+    ) -> None:
         if not _same_track(self._track, result) or self._clock is None:
             self._clock = PlaybackClock(self._clock_config)
-            self._palette = extract_palette(result.cover_url)
+            self._palette = palette if palette is not None else FALLBACK_PALETTE
 
         self._clock.add_anchor(wall_time=wall_time, position_sec=result.offset or 0.0, timeskew=result.timeskew or 0.0)
         self._track = result
@@ -43,6 +52,8 @@ class PlaybackSession:
 
     def on_unidentified(self) -> None:
         self._state = DisplayState.UNIDENTIFIED
+        self._track = None
+        self._lyrics = None
 
     def on_track_gap(self) -> None:
         pass  # a signal, not a trigger — see spec §2; nothing to clear here

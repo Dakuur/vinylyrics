@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from pathlib import Path
 from typing import Callable
@@ -12,9 +13,16 @@ from fastapi.responses import FileResponse
 from vinylyrics.engine import Engine
 from vinylyrics.state.session import PlaybackSession
 
+logger = logging.getLogger(__name__)
 
-def create_app(session: PlaybackSession, engine: Engine, now_fn: Callable[[], float] = time.monotonic) -> FastAPI:
-    app = FastAPI()
+
+def create_app(
+    session: PlaybackSession,
+    engine: Engine,
+    now_fn: Callable[[], float] = time.time,
+    lifespan=None,
+) -> FastAPI:
+    app = FastAPI(lifespan=lifespan)
     clients: set[WebSocket] = set()
 
     def broadcast() -> None:
@@ -29,7 +37,9 @@ def create_app(session: PlaybackSession, engine: Engine, now_fn: Callable[[], fl
             # via its `finally` block below; this callback only guards the
             # narrow race where a client drops between broadcasts before
             # that handler has run.
-            task.add_done_callback(lambda t, ws=ws: clients.discard(ws) if t.exception() else None)
+            task.add_done_callback(
+                lambda t, ws=ws: clients.discard(ws) if not t.cancelled() and t.exception() else None
+            )
 
     app.state.broadcast = broadcast
 
@@ -41,6 +51,9 @@ def create_app(session: PlaybackSession, engine: Engine, now_fn: Callable[[], fl
 
     @app.get("/health")
     def health():
+        engine_error = getattr(app.state, "engine_error", None)
+        if engine_error is not None:
+            return {"status": "degraded", "error": str(engine_error)}
         return {"status": "ok"}
 
     @app.get("/debug")
